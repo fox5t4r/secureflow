@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>SecureFlow · 보안 진단 워크스페이스</title>
+    <link
+      rel="preload"
+      href="/static/fonts/PretendardVariable.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="/static/dashboard.css" />
+    <script src="/static/dashboard.js" defer></script>
+  </head>
+  <body>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <main id="login-view" class="login-view">
+      <section class="login-story" aria-label="SecureFlow 소개">
+        <a class="brand" href="/" aria-label="SecureFlow 홈"
+          ><span class="brand-mark" data-icon="mark" aria-hidden="true"></span
+          ><span>Secure<span class="accent">Flow</span></span></a
+        >
+        <div class="story-content">
+          <h1>진단부터 개선까지,<br />한곳에서.</h1>
+          <p>
+            코드와 실행 환경의 증거를 한곳에서 연결하세요.<br />분석의 진행
+            상태부터 다음 수정까지 명확하게.
+          </p>
+          <div class="story-flow">
+            <span>코드 분석</span><i>→</i><span>동적 검증</span><i>→</i
+            ><span>개선 리포트</span>
+          </div>
+        </div>
+        <small>로컬 보안 진단 워크스페이스 · 관리자 전용</small>
+      </section>
+      <section class="login-panel">
+        <form id="login-form" class="login-card">
+          <div class="small-icon" data-icon="lock" aria-hidden="true"></div>
+
+          <h2>관리자 로그인</h2>
+          <p>등록된 관리자 계정으로 워크스페이스에 접속하세요.</p>
+          <label for="login-username">관리자 아이디</label
+          ><input
+            id="login-username"
+            name="username"
+            autocomplete="username"
+            required
+            placeholder="관리자 아이디 입력"
+          /><label for="login-password">비밀번호</label
+          ><input
+            id="login-password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            required
+            placeholder="비밀번호 입력"
+          />
+          <p id="login-error" class="form-error" role="alert" hidden></p>
+          <button class="button primary full" type="submit">
+            워크스페이스 접속 <span aria-hidden="true">→</span>
+          </button>
+          <div class="login-note">
+            <span class="status-dot"></span> 관리자만 접근할 수 있는
+            워크스페이스
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <div id="app-view" class="app-shell" hidden>
+      <aside class="sidebar">
+        <a class="brand" href="/" aria-label="SecureFlow 홈"
+          ><span class="brand-mark" data-icon="mark" aria-hidden="true"></span
+          ><span>Secure<span class="accent">Flow</span></span></a
+        >
+        <div class="workspace-label">
+          <span class="status-dot"></span> 보안 진단 워크스페이스
+        </div>
+        <nav aria-label="주 메뉴">
+          <button class="nav-item active" data-view="overview">
+            <span class="nav-icon" data-icon="grid" aria-hidden="true"></span
+            >대시보드
+          </button>
+          <button class="nav-item" data-view="targets">
+            <span class="nav-icon" data-icon="globe" aria-hidden="true"></span
+            >진단 대상<span id="nav-target-count" class="nav-count">0</span>
+          </button>
+          <button class="nav-item" data-view="jobs">
+            <span
+              class="nav-icon"
+              data-icon="activity"
+              aria-hidden="true"
+            ></span
+            >진단 작업<span id="nav-job-count" class="nav-count">0</span>
+          </button>
+          <button class="nav-item" data-view="settings">
+            <span
+              class="nav-icon"
+              data-icon="settings"
+              aria-hidden="true"
+            ></span
+            >AI·계정 설정
+          </button>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="system-state">
+            <span class="status-dot"></span
+            ><span id="connection-state">연결 중</span>
+          </div>
+          <div class="admin-profile">
+            <span class="avatar">A</span>
+            <div>
+              <strong id="admin-name">관리자</strong><small>관리자</small>
+            </div>
+            <button
+              id="logout-button"
+              class="icon-button"
+              aria-label="로그아웃"
+              title="로그아웃"
+            >
+              <span data-icon="logout" aria-hidden="true"></span>
+            </button>
+          </div>
+        </div>
+      </aside>
+      <div class="workspace">
+        <header class="topbar">
+          <div class="breadcrumb">
+            워크스페이스 <span>/</span>
+            <strong id="breadcrumb-current">대시보드</strong>
+          </div>
+          <div class="topbar-right">
+            <span class="environment-badge">로컬 환경</span
+            ><span id="updated-time" class="updated-time">동기화 중</span
+            ><button
+              id="mobile-logout-button"
+              class="icon-button mobile-only"
+              aria-label="로그아웃"
+              title="로그아웃"
+            >
+              <span data-icon="logout" aria-hidden="true"></span>
+            </button>
+          </div>
+        </header>
+        <main class="main-content">
+          <section id="view-overview" class="view">
+            <div class="page-heading">
+              <div>
+                <h1>보안 현황</h1>
+                <p>진단 현황과 확인된 취약점을 살펴보세요.</p>
+              </div>
+              <button class="button primary" id="overview-new-job">
+                <span data-icon="plus" aria-hidden="true"></span> 새 진단
+              </button>
+            </div>
+            <div class="metrics-grid">
+              <div class="metric-card">
+                <div class="metric-label">등록된 진단 대상</div>
+                <strong id="metric-targets">0</strong
+                ><small>관리 중인 애플리케이션</small>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">진행 중인 작업</div>
+                <strong id="metric-running">0</strong
+                ><small>코드·동적·AI 병렬 분석</small>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">검증된 발견</div>
+                <strong id="metric-findings" class="accent">0</strong
+                ><small>최근 진단 결과 기준</small>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">통합 리포트</div>
+                <strong id="metric-reports">0</strong
+                ><small>다운로드 가능한 완료 작업</small>
+              </div>
+            </div>
+            <div class="overview-columns">
+              <section class="panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>최근 진단 작업</h2>
+                    <p>자동으로 업데이트되는 분석 진행 상태</p>
+                  </div>
+                  <button class="text-button" data-view="jobs">
+                    전체 보기
+                    <span data-icon="chevron" aria-hidden="true"></span>
+                  </button>
+                </div>
+                <div id="recent-jobs" class="job-list"></div>
+              </section>
+              <section class="panel workflow-panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>진단 흐름</h2>
+                  </div>
+                </div>
+                <ol class="workflow-steps">
+                  <li>
+                    <span>01</span>
+                    <div>
+                      <strong>분석 시작</strong>
+                      <p>등록된 대상과 계정을 사용해 검사를 실행합니다.</p>
+                    </div>
+                  </li>
+                  <li>
+                    <span>02</span>
+                    <div>
+                      <strong>코드·동적 검사 + AI</strong>
+                      <p>선택한 AI 분석은 코드 검사와 병렬로 진행됩니다.</p>
+                    </div>
+                  </li>
+                  <li>
+                    <span>03</span>
+                    <div>
+                      <strong>빠른 리포트</strong>
+                      <p>기본 진단이 끝나면 AI를 기다리지 않고 확인합니다.</p>
+                    </div>
+                  </li>
+                  <li>
+                    <span>04</span>
+                    <div>
+                      <strong>통합 리포트</strong>
+                      <p>
+                        모든 결과와 도구 비교, 개선 가이드를 함께 확인합니다.
+                      </p>
+                    </div>
+                  </li>
+                </ol>
+                <div class="subtle-note">
+                  AI 의견과 검증된 사실은 별도로 표시됩니다.
+                </div>
+              </section>
+            </div>
+            <section class="panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>진단 대상</h2>
+                  <p>검사에 사용할 애플리케이션과 테스트 계정</p>
+                </div>
+                <button class="text-button" data-view="targets">
+                  대상 관리 <span data-icon="chevron" aria-hidden="true"></span>
+                </button>
+              </div>
+              <div id="overview-targets" class="target-mini-grid"></div>
+            </section>
+          </section>
+
+          <section id="view-targets" class="view" hidden>
+            <div class="page-heading">
+              <div>
+                <h1>진단 대상</h1>
+                <p>분석할 애플리케이션과 테스트 계정을 등록하세요.</p>
+              </div>
+              <button id="add-target-button" class="button primary">
+                <span data-icon="plus" aria-hidden="true"></span> 대상 등록
+              </button>
+            </div>
+            <div class="notice">
+              <span aria-hidden="true">ⓘ</span>
+              <div>
+                현재 동적 진단은 로컬 OWASP Juice Shop 어댑터를 지원합니다. 임의
+                사이트의 자동 진단을 보장하지 않습니다.<br />계정 정보는 대상
+                앱의 인증 검사에 사용되며 비밀번호는 조회 화면과 리포트에
+                표시되지 않습니다.
+              </div>
+            </div>
+            <div id="target-list" class="target-grid"></div>
+          </section>
+
+          <section id="view-jobs" class="view" hidden>
+            <div class="page-heading">
+              <div>
+                <h1>진단 작업</h1>
+                <p>작업별 분석 상태와 검증 증거를 확인하세요.</p>
+              </div>
+              <button id="jobs-new-job" class="button primary">
+                <span data-icon="plus" aria-hidden="true"></span> 새 진단
+              </button>
+            </div>
+            <div class="panel">
+              <div class="table-toolbar">
+                <div
+                  class="segmented"
+                  id="job-filters"
+                  role="group"
+                  aria-label="작업 상태 필터"
+                >
+                  <button class="active" data-status="all">전체</button
+                  ><button data-status="running">진행 중</button
+                  ><button data-status="complete">완료</button
+                  ><button data-status="failed">오류</button>
+                </div>
+                <span id="jobs-total" class="muted"></span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>대상 / 작업</th>
+                      <th>진단 상태</th>
+                      <th>AI 분석</th>
+                      <th>시작 시간</th>
+                      <th>리포트</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="jobs-table"></tbody>
+                </table>
+              </div>
+              <div id="jobs-empty" class="empty-state" hidden>
+                <span>≋</span>
+                <h3>아직 진단 작업이 없습니다</h3>
+                <p>대상을 등록하고 첫 진단을 시작하세요.</p>
+              </div>
+            </div>
+          </section>
+
+          <section id="view-detail" class="view" hidden>
+            <button class="text-button back-button" id="detail-back">
+              ← 진단 작업으로
+            </button>
+            <div class="page-heading">
+              <div>
+                <h1 id="detail-title">진단 결과</h1>
+                <p id="detail-meta"></p>
+              </div>
+              <span id="detail-status"></span>
+            </div>
+            <div id="detail-error" class="notice error" hidden></div>
+            <div class="report-grid">
+              <section class="report-card">
+                <div
+                  class="report-icon"
+                  data-icon="document"
+                  aria-hidden="true"
+                ></div>
+                <div>
+                  <h2>빠른 리포트</h2>
+                  <p>
+                    기본 진단 결과를 먼저 확인하세요.<br />AI 분석 완료를
+                    기다리지 않습니다.
+                  </p>
+                </div>
+                <a
+                  id="quick-report"
+                  class="button secondary disabled"
+                  aria-disabled="true"
+                  >생성 대기 중</a
+                >
+              </section>
+              <section class="report-card final">
+                <div
+                  class="report-icon"
+                  data-icon="document"
+                  aria-hidden="true"
+                ></div>
+                <div>
+                  <h2>통합 리포트</h2>
+                  <p>
+                    진단·비교·AI 의견과 개선 가이드를<br />하나의 리포트로
+                    확인하세요.
+                  </p>
+                </div>
+                <a
+                  id="final-report"
+                  class="button primary disabled"
+                  aria-disabled="true"
+                  >생성 대기 중</a
+                >
+              </section>
+            </div>
+            <div class="panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>OWASP Top 10 확인 현황</h2>
+                  <p>
+                    검증된 발견이 연결된 범주입니다. 발견이 없다고 안전함을
+                    뜻하지 않습니다.
+                  </p>
+                </div>
+                <span id="coverage-count" class="count-badge">0 / 10</span>
+              </div>
+              <div id="coverage-grid" class="coverage-grid"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>발견 사항과 개선 가이드</h2>
+                  <p>근거와 재현 범위를 확인한 뒤 우선순위를 판단하세요.</p>
+                </div>
+                <span id="finding-count" class="count-badge">0개</span>
+              </div>
+              <div id="finding-list" class="finding-list"></div>
+            </div>
+            <div class="overview-columns">
+              <section class="panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>도구 비교</h2>
+                    <p>도구별 조건과 측정된 결과</p>
+                  </div>
+                </div>
+                <div id="comparison-content"></div>
+                <p class="subtle-note">
+                  경고 수는 취약점 수 또는 오탐률과 같지 않습니다.
+                </p>
+              </section>
+              <section class="panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>선택적 AI 분석</h2>
+                    <p>코드 검사와 병렬로 실행되는 보조 분석</p>
+                  </div>
+                  <span id="ai-status"></span>
+                </div>
+                <div id="ai-content"></div>
+                <p class="subtle-note">
+                  AI 분석은 검토 의견이며 실제 재현 증거를 대신하지 않습니다.
+                </p>
+              </section>
+            </div>
+          </section>
+
+          <section id="view-settings" class="view" hidden>
+            <div class="page-heading">
+              <div>
+                <h1>AI·계정 설정</h1>
+                <p>
+                  구독 계정 CLI 또는 로컬 모델을 연결하고 관리자 계정을
+                  관리하세요.
+                </p>
+              </div>
+            </div>
+            <div class="settings-layout">
+              <form id="settings-form" class="panel settings-form">
+                <div class="panel-heading">
+                  <div>
+                    <h2>AI 연결</h2>
+                    <p>내 PC에 로그인된 Codex·Claude Code 또는 Ollama</p>
+                  </div>
+                  <span class="environment-badge">선택 기능</span>
+                </div>
+                <label for="ai-provider">연결 방식</label
+                ><select id="ai-provider">
+                  <option value="codex">Codex · ChatGPT 계정</option>
+                  <option value="claude">Claude Code · Claude 계정</option>
+                  <option value="ollama">Ollama · 내 PC 모델</option>
+                </select>
+                <p id="ai-connection-status" class="field-help"></p>
+                <button
+                  id="ai-check-connection"
+                  type="button"
+                  class="button secondary"
+                >
+                  설치·로그인 확인</button
+                ><label for="ai-url">Ollama 서버 URL (Ollama 선택 시)</label
+                ><input
+                  id="ai-url"
+                  name="ai_url"
+                  type="url"
+                  placeholder="http://127.0.0.1:11434"
+                  required
+                /><label for="ai-model">모델 이름</label
+                ><input
+                  id="ai-model"
+                  name="ai_model"
+                  placeholder="CLI 기본 모델은 비워 두세요"
+                /><label for="ai-deep-model"
+                  >심층 분석용 고급 모델
+                  <span class="optional">선택</span></label
+                ><input
+                  id="ai-deep-model"
+                  placeholder="계정에서 사용할 수 있는 모델 ID / Claude: opus"
+                /><label for="ai-effort">추론 강도</label
+                ><select id="ai-effort">
+                  <option value="low">낮음</option>
+                  <option value="medium">보통</option>
+                  <option value="high" selected>높음</option>
+                </select>
+                <label for="ai-local-model-a">로컬 앙상블 · 코드 모델</label>
+                <input id="ai-local-model-a" placeholder="qwen2.5-coder:1.5b" />
+                <label for="ai-local-model-b">로컬 앙상블 · 보조 모델</label>
+                <input id="ai-local-model-b" placeholder="qwen2.5:0.5b" />
+                <p class="field-help">
+                  secureflow setup --ollama로 경량 모델 2종을 설치합니다.
+                  앙상블은 두 모델을 순차 실행하며 한 모델 실패 시 나머지 결과를
+                  보존합니다.
+                </p>
+                <p class="field-help">
+                  Codex는 터미널에서 codex login, Claude Code는 claude auth
+                  login으로 먼저 로그인하세요. 구독 한도와 모델 접근 권한이
+                  적용됩니다. 소스 발췌가 해당 제공자로 전송되며 이 앱은 로그인
+                  토큰을 수집하지 않습니다. Ollama는 외부 전송 없이 PC에서
+                  추론합니다.
+                </p>
+                <button class="button primary" type="submit">
+                  연결 설정 저장
+                </button>
+              </form>
+              <section class="panel settings-explainer">
+                <h2>AI는 어디에 쓰이나요?</h2>
+                <p>
+                  선택한 모델이 코드 맥락과 분석 자료를 검토해 추가 가설 및 수정
+                  방향을 제안합니다.
+                </p>
+                <p>
+                  기본 진단과 별도로 실행되므로 AI 응답이 늦어도 빠른 리포트를
+                  확인할 수 있습니다.
+                </p>
+                <div class="notice">
+                  AI를 끈 상태에서도 코드·동적 진단과 리포트 생성은 동작합니다.
+                </div>
+              </section>
+              <form id="admin-password-form" class="panel settings-form">
+                <div class="panel-heading">
+                  <div>
+                    <h2>관리자 비밀번호 변경</h2>
+                    <p>현재 비밀번호를 확인한 후 새 비밀번호를 적용합니다.</p>
+                  </div>
+                </div>
+                <label for="admin-current-password">현재 비밀번호</label
+                ><input
+                  id="admin-current-password"
+                  name="current_password"
+                  type="password"
+                  autocomplete="current-password"
+                  required
+                /><label for="admin-new-password">새 비밀번호</label
+                ><input
+                  id="admin-new-password"
+                  name="new_password"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="12"
+                  required
+                /><label for="admin-confirm-password">새 비밀번호 확인</label
+                ><input
+                  id="admin-confirm-password"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="12"
+                  required
+                />
+                <p class="field-help">
+                  새 비밀번호는 12자 이상 입력하세요. 변경 후 현재 로그인은
+                  유지됩니다.
+                </p>
+                <p
+                  id="admin-password-error"
+                  class="form-error"
+                  role="alert"
+                  hidden
+                ></p>
+                <button type="submit" class="button primary">
+                  비밀번호 변경
+                </button>
+              </form>
+            </div>
+          </section>
+        </main>
+        <footer class="workspace-footer">
+          <span
+            >SecureFlow <span class="muted">/</span> 증거 기반 보안 진단</span
+          ><span>로컬 워크스페이스 · 관리자 접근</span>
+        </footer>
+      </div>
+    </div>
+
+    <dialog id="target-dialog">
+      <form id="target-form">
+        <div class="dialog-heading">
+          <div>
+            <span id="target-dialog-eyebrow" class="eyebrow">NEW TARGET</span>
+            <h2 id="target-dialog-title">진단 대상 등록</h2>
+          </div>
+          <button
+            type="button"
+            class="icon-button"
+            data-close="target-dialog"
+            aria-label="닫기"
+          >
+            <span data-icon="close" aria-hidden="true"></span>
+          </button>
+        </div>
+        <label for="target-name">대상 이름</label
+        ><input
+          id="target-name"
+          name="name"
+          placeholder="예: OWASP Juice Shop"
+          required
+          maxlength="120"
+        /><label for="target-url">애플리케이션 URL</label
+        ><input
+          id="target-url"
+          name="url"
+          type="url"
+          placeholder="http://127.0.0.1:3000"
+          required
+        />
+        <p class="field-help">
+          현재 지원 대상: 로컬 OWASP Juice Shop. 다른 앱은 전용 검증 어댑터가
+          필요합니다.
+        </p>
+        <label for="target-source"
+          >소스코드 경로 <span class="optional">선택</span></label
+        ><input
+          id="target-source"
+          name="source_path"
+          placeholder="예: /path/to/secureflow/.local/sources/juice-shop"
+        />
+        <details class="credential-fields">
+          <summary>테스트 계정 연결 <span class="optional">선택</span></summary>
+          <p class="field-help">
+            등록한 계정으로 대상 앱에 로그인해 인증된 검사를 수행합니다.
+          </p>
+          <label for="target-username">테스트 계정 아이디 / 이메일</label
+          ><input
+            id="target-username"
+            name="username"
+            autocomplete="off"
+            placeholder="테스트 계정"
+          /><label for="target-password">테스트 계정 비밀번호</label
+          ><input
+            id="target-password"
+            name="password"
+            type="password"
+            autocomplete="new-password"
+            placeholder="서버에 보호하여 보관"
+          />
+          <p id="target-password-help" class="field-help" hidden>
+            비밀번호를 비워 두면 기존에 보관된 비밀번호를 유지합니다.
+          </p>
+        </details>
+        <p id="target-form-error" class="form-error" role="alert" hidden></p>
+        <div class="dialog-actions">
+          <button type="button" class="button ghost" data-close="target-dialog">
+            취소</button
+          ><button
+            id="target-submit-button"
+            type="submit"
+            class="button primary"
+          >
+            대상 등록
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="job-dialog">
+      <form id="job-form">
+        <div class="dialog-heading">
+          <div>
+            <h2>새 진단 시작</h2>
+          </div>
+          <button
+            type="button"
+            class="icon-button"
+            data-close="job-dialog"
+            aria-label="닫기"
+          >
+            <span data-icon="close" aria-hidden="true"></span>
+          </button>
+        </div>
+        <label for="job-target">진단 대상</label
+        ><select id="job-target" name="target_id" required></select
+        ><label class="check-card"
+          ><input
+            type="checkbox"
+            name="compare_tools"
+            id="job-compare"
+            checked
+          /><span
+            ><strong>오픈소스 도구 비교</strong
+            ><small>ZAP·Semgrep 결과를 수집해 함께 비교합니다.</small></span
+          ></label
+        ><label class="check-card"
+          ><input type="checkbox" name="ai_enabled" id="job-ai" /><span
+            ><strong>AI 보조 분석 사용</strong
+            ><small
+              >선택한 구독 계정 CLI 또는 로컬 모델이 병렬로 분석합니다.</small
+            ></span
+          ></label
+        ><label for="job-ai-mode">AI 분석 깊이</label
+        ><select id="job-ai-mode">
+          <option value="standard">일반 · 소스 검토 1회</option>
+          <option value="deep">
+            심층 · 근거 검토 → 반론 검토 → 개선안 통합
+          </option>
+          <option value="ensemble">
+            로컬 앙상블 · 경량 모델 2종 독립 검토
+          </option>
+        </select>
+        <p class="field-help">
+          심층 분석은 최대 3회 모델 호출로 더 오래 걸리고 구독 사용량을 더
+          사용합니다. 앙상블은 위 구독 연결과 별개로 로컬 Ollama를 사용합니다.
+          AI가 없거나 실패하면 일반 진단으로 완료됩니다. 모든 AI 발견은 미검증
+          가설입니다.
+        </p>
+        <div class="notice">
+          기본 진단이 끝나면 빠른 리포트가 생성됩니다. AI 결과는 통합 리포트에
+          반영됩니다.
+        </div>
+        <p id="job-form-error" class="form-error" role="alert" hidden></p>
+        <div class="dialog-actions">
+          <button type="button" class="button ghost" data-close="job-dialog">
+            취소</button
+          ><button type="submit" class="button primary">진단 실행 →</button>
+        </div>
+      </form>
+    </dialog>
+  </body>
+</html>

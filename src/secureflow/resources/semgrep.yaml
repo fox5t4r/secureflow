@@ -1,0 +1,52 @@
+# SecureFlow-authored rules; MIT. Fixed comparison suite, not Semgrep default policy.
+rules:
+  - id: interpolated-sql
+    languages: [typescript, javascript]
+    message: Template SQL query requires parameter binding review.
+    severity: ERROR
+    pattern-regex: '\.query\(\s*`[^`\n]*\$\{'
+    metadata: {owasp: 'A05:2025', cwe: 'CWE-89'}
+  - id: weak-password-hash
+    languages: [typescript, javascript]
+    message: MD5 or SHA1 must not be used for password storage.
+    severity: WARNING
+    pattern-regex: 'createHash\(["\x27](md5|sha1)["\x27]\)'
+    metadata: {owasp: 'A04:2025', cwe: 'CWE-916'}
+  - id: request-redirect
+    languages: [typescript, javascript]
+    message: Redirect destination requires exact origin validation.
+    severity: WARNING
+    pattern: $RES.redirect($DEST)
+    metadata: {owasp: 'A01:2025', cwe: 'CWE-601'}
+  - id: directory-listing
+    languages: [typescript, javascript]
+    message: Public directory listing may disclose internal files.
+    severity: WARNING
+    pattern: serveIndex(...)
+    metadata: {owasp: 'A02:2025', cwe: 'CWE-548'}
+  - id: raw-error-handler
+    languages: [typescript, javascript]
+    message: Development error handler can expose internal errors.
+    severity: WARNING
+    pattern: errorhandler(...)
+    metadata: {owasp: 'A02:2025', cwe: 'CWE-209'}
+  - id: eval-input
+    languages: [typescript, javascript]
+    message: Dynamic evaluation requires data-flow review.
+    severity: ERROR
+    pattern: eval($X)
+    metadata: {owasp: 'A05:2025', cwe: 'CWE-95'}
+  - id: body-owner-id
+    languages: [typescript, javascript]
+    message: Client-provided owner identifiers require server ownership validation.
+    severity: WARNING
+    pattern-either:
+      - pattern: $REQ.body.UserId
+      - pattern: $REQ.body.BasketId
+    metadata: {owasp: 'A01:2025', cwe: 'CWE-639'}
+  - id: disabled-tls-verification
+    languages: [typescript, javascript]
+    message: TLS certificate verification disabled.
+    severity: ERROR
+    pattern-regex: 'rejectUnauthorized\s*:\s*false'
+    metadata: {owasp: 'A04:2025', cwe: 'CWE-295'}

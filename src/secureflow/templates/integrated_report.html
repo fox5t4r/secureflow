@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title }} · {{ job.target_name }} · SecureFlow</title>
+    <style>
+      @font-face { font-family: 'Report Batang'; src: url(data:font/woff2;base64,{{ assets.font }}) format('woff2'); font-weight: 400; font-display: swap; }
+      {{ assets.css|safe }}
+    </style>
+  </head>
+  <body>
+    <nav class="toolbar" aria-label="리포트 도구">
+      <a href="#executive">핵심 요약</a><a href="#actions">조치 목록</a
+      ><a href="#findings">상세 근거</a><a href="#appendix">분석 부록</a>
+      <button id="expand-all" type="button">상세 모두 펼치기</button>
+      <button id="collapse-all" type="button">상세 접기</button>
+      <button id="print-report" type="button">인쇄 / PDF 저장</button>
+    </nav>
+    <main>
+      <section
+        class="paper executive"
+        id="executive"
+        aria-labelledby="report-title"
+      >
+        <div class="folio">
+          <span>SECUREFLOW · 보안 진단 보고</span
+          ><span
+            >{{ '조기 보고' if kind == 'quick' else '통합 보고' }} / 01</span
+          >
+        </div>
+        <header class="report-heading">
+          <p class="kicker">의사결정을 위한 핵심 요약</p>
+          <h1 id="report-title">웹 애플리케이션<br />보안 진단 보고서</h1>
+          <p class="target-name">{{ job.target_name|truncate(75) }}</p>
+          <dl class="metadata">
+            <div>
+              <dt>진단 대상</dt>
+              <dd>{{ job.target_url|truncate(110) }}</dd>
+            </div>
+            <div>
+              <dt>진단 시작</dt>
+              <dd>{{ view.created }}</dd>
+            </div>
+            <div>
+              <dt>보고 구분</dt>
+              <dd>
+                {{ '빠른 리포트 · AI 결과 제외' if kind == 'quick' else '통합
+                리포트 · 완료·실패·미사용 상태 포함' }}
+              </dd>
+            </div>
+          </dl>
+        </header>
+        <div
+          class="verdict {{ 'attention' if view.high or job.error else '' }}"
+        >
+          <p class="kicker">종합 판단</p>
+          <h2>{{ view.verdict }}</h2>
+          <p>
+            {{ findings|length }}개 검사 항목 중 {{ view.confirmed }}건 검증 ·
+            {{ view.not_reproduced }}건 미재현 · {{ view.unresolved }}건 미확인
+          </p>
+        </div>
+        <div class="metrics" aria-label="핵심 지표">
+          <div>
+            <span>검증된 발견</span
+            ><strong>{{ view.confirmed }}<small>건</small></strong>
+          </div>
+          <div>
+            <span>높은 심각도</span
+            ><strong class="risk-number"
+              >{{ view.high }}<small>건</small></strong
+            >
+          </div>
+          <div>
+            <span>발견된 OWASP 범주</span
+            ><strong>{{ view.categories }}<small>/ 10</small></strong>
+          </div>
+          <div>
+            <span>AI 보조 분석</span
+            ><strong class="text-metric"
+              >{{ '결과 제외' if kind == 'quick' else view.ai_label }}</strong
+            >
+          </div>
+        </div>
+        <section class="priority-section" aria-labelledby="priority-title">
+          <div class="section-line">
+            <h2 id="priority-title">우선 조치</h2>
+            <span
+              >검증된 발견 중 상위 {{ view.top|length }}건 · 규칙 심각도순</span
+            >
+          </div>
+          {% for card in view.top %}
+          <div class="priority-row">
+            <a class="reference" href="#{{ card.ref }}"
+              >{{ card.ref }}<span>{{ card.priority }}</span></a
+            >
+            <div>
+              <h3>{{ card.finding.title|truncate(55) }}</h3>
+              <p class="observation">{{ card.observation }}</p>
+              <p class="action"><b>조치</b> {{ card.action_short }}</p>
+            </div>
+          </div>
+          {% else %}
+          <p class="empty">
+            확정된 수정 과제가 없습니다. 미확인 항목과 도구 실패 여부를 검토한
+            후 진단 범위를 보완하세요.
+          </p>
+          {% endfor %}
+        </section>
+        <div class="decision-note">
+          <b>요청 사항</b> 담당자와 목표일을 지정하고, 수정 후 동일 조건으로
+          재검증하세요. 이 보고서에는 수정 완료 또는 배포 승인 판정이 포함되지
+          않습니다.
+        </div>
+        <div class="scope-note">
+          <b>판단 범위</b> 자체 실습 환경의 관측 결과입니다. 미재현은 안전
+          판정이 아니며, 도구 경고와 AI 의견은 검증 건수에 합산하지 않습니다.
+          범주 수는 전체 탐지율이 아닙니다. {% if job.error %}<br /><b
+            >진단 실패</b
+          >
+          일부 결과만 확보되었습니다. 실패 원인은 분석 부록에서 확인하세요.{%
+          endif %} {% if view.tool_issues %}<br /><b>검사 공백</b> 완료되지 않은
+          도구 {{ view.tool_issues }}개. 세부 상태는 분석 부록에 기재했습니다.{%
+          endif %} {% if kind == 'quick' %}<br />이 문서는 기본 검사 시점의
+          스냅샷입니다. 진행 중인 비교 도구·AI 결과는 통합 리포트에서
+          확인하세요.{% endif %}
+        </div>
+        <footer class="page-footer">
+          <span>작업 {{ job.id }}</span
+          ><a href="#actions">다음 · 전체 조치 목록 →</a>
+        </footer>
+      </section>
+
+      <section class="paper" id="actions">
+        <div class="folio">
+          <span>SECUREFLOW · 실행 계획</span><span>02 / 조치 목록</span>
+        </div>
+        <h2 class="page-title">무엇부터 수정할 것인가</h2>
+        <p class="lead">
+          검증된 항목을 먼저 배치했습니다. 담당 영역은 제안이며,
+          담당자·목표일·완료 여부는 아직 확정하지 않았습니다.
+        </p>
+        <div class="legend">
+          <b>P1</b> 검증된 Critical/High · 우선 수정 &nbsp; <b>P2</b> 그 외
+          검증된 발견 · 개선 계획 &nbsp; <b>검토</b> 미재현·미확인
+        </div>
+        <p class="fine">
+          우선순위는 규칙 심각도를 기준으로 한 작업 순서입니다. CVSS 점수나
+          합의된 조치 기한을 의미하지 않습니다.
+        </p>
+        <div class="table-scroll">
+          <table class="action-table">
+            <thead>
+              <tr>
+                <th>번호 / 순위</th>
+                <th>발견 사항 · 위치</th>
+                <th>조치와 완료 조건</th>
+                <th>담당 / 목표일</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for card in view.cards %}
+              <tr>
+                <td>
+                  <a href="#{{ card.ref }}">{{ card.ref }}</a><br /><b
+                    >{{ card.priority }}</b
+                  ><br /><span class="state-label">{{ card.state_label }}</span>
+                </td>
+                <td>
+                  <b>{{ card.finding.title }}</b><br /><code
+                    >{{ card.finding.source }}</code
+                  >
+                </td>
+                <td>
+                  {{ card.guide.action }}
+                  <p class="fine">
+                    <b>완료 조건</b> {{ card.guide.acceptance }}
+                  </p>
+                </td>
+                <td>
+                  {{ card.guide.owner }}<br /><span class="fine"
+                    >담당자 미지정<br />목표일 미정<br />재검증 전</span
+                  >
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="4">
+                  수집된 검사 항목이 없습니다. 진단 상태와 검사 범위를
+                  확인하세요.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="decision-note">
+          <b>종결 기준</b> 수정 코드 검토 → 동일 조건의 재현 요청 차단 → 정상
+          대조 요청 성공 → 증거와 검토자 기록. 아래 예시 코드는 자동 적용된
+          패치가 아닙니다.
+        </div>
+      </section>
+
+      <section class="paper" id="findings">
+        <div class="folio">
+          <span>SECUREFLOW · 기술 검토</span><span>03 / 상세 근거 및 개선</span>
+        </div>
+        <h2 class="page-title">발견 사항과 수정 가이드</h2>
+        <p class="lead">
+          제목을 누르면 관측 내용, 수정 예시, 재검증 기준이 열립니다. 인쇄 시
+          상세 본문은 자동으로 펼쳐집니다.
+        </p>
+        {% for card in view.cards %}
+        <article
+          class="finding-card"
+          id="{{ card.ref }}"
+          data-state="{{ card.finding.state }}"
+        >
+          <details data-print-expand>
+            <summary>
+              <span class="reference"
+                >{{ card.ref }}<span>{{ card.priority }}</span></span
+              ><span class="finding-title"
+                >{{ card.finding.title }}<small
+                  >{{ card.finding.severity }} · {{ card.finding.owasp }} · {{
+                  card.finding.cwe }}</small
+                ></span
+              ><span
+                class="status {{ 'confirmed' if card.finding.state == 'confirmed' else '' }}"
+                >{{ card.state_label }}</span
+              >
+            </summary>
+            <div class="finding-body">
+              <dl class="finding-meta">
+                <div>
+                  <dt>코드 위치</dt>
+                  <dd><code>{{ card.finding.source }}</code></dd>
+                </div>
+                <div>
+                  <dt>검증 상태</dt>
+                  <dd>{{ card.state_label }} · 수정 후 재검증 전</dd>
+                </div>
+              </dl>
+              <h3>관측 결과와 입증 범위</h3>
+              <p>{{ card.finding.detail }}</p>
+              {% if card.finding.state != 'confirmed' %}
+              <p class="notice">
+                이 항목은 확정 취약점이 아닙니다. 현재 입력에서 재현하지
+                못했거나 검증이 불완전합니다. 수정 필요성은 추가 검토로
+                결정하세요.
+              </p>
+              {% endif %}
+              <h3>수정 가이드</h3>
+              <p>{{ card.guide.action }}</p>
+              <p class="fine">
+                적용 예시 · 실제 코드 구조, 미들웨어, ORM 버전에 맞게 수정해야
+                합니다. 검토·적용·재검증은 아직 수행하지 않았습니다.
+              </p>
+              <pre class="code-example"><code>{{ card.guide.code }}</code></pre>
+              <h3>재검증 완료 조건</h3>
+              <p>{{ card.guide.acceptance }}</p>
+              <h3>요청·응답 근거</h3>
+              {% if card.finding.evidence %}
+              <div class="table-scroll">
+                <table class="evidence-table">
+                  <thead>
+                    <tr>
+                      <th>증거</th>
+                      <th>요청</th>
+                      <th>HTTP</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for item in card.finding.evidence %}
+                    <tr>
+                      <td>E-{{ item.id }}</td>
+                      <td><code>{{ item.method }} {{ item.path }}</code></td>
+                      <td>{{ item.status }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              <p class="fine">
+                위 표는 수집 순서와 HTTP 상태를 보여줍니다. 상태 코드만으로
+                취약점을 확정하지 않으며, 대조 응답과 본문 차이를 함께 검토해야
+                합니다.
+              </p>
+              {% else %}
+              <p>
+                요청·응답 증거가 첨부되지 않았습니다. 독립적인 재현 확인이
+                필요합니다.
+              </p>
+              {% endif %}
+              <details class="raw-evidence">
+                <summary>원본 요청·응답 펼치기 · HTML 전용</summary>
+                <pre>{{ card.finding.evidence|default([])|pretty }}</pre>
+              </details>
+              <p class="print-note">
+                전체 요청·응답 원문은 HTML 보고서의 ‘원본 요청·응답’ 토글에
+                포함되어 있습니다.
+              </p>
+              {% if card.finding.reference and
+              card.finding.reference.startswith('https://') %}
+              <p class="fine">
+                참고:
+                <a href="{{ card.finding.reference }}" rel="noreferrer"
+                  >분류 및 개선 지침</a
+                >
+                · 세부 유형과 적용 범위를 확인하세요.
+              </p>
+              {% endif %}
+            </div>
+          </details>
+        </article>
+        {% else %}
+        <p>표시할 검사 항목이 없습니다.</p>
+        {% endfor %}
+      </section>
+
+      <section class="paper" id="appendix">
+        <div class="folio">
+          <span>SECUREFLOW · 분석 부록</span><span>04 / 범위·도구·AI</span>
+        </div>
+        <h2 class="page-title">진단 조건과 해석의 한계</h2>
+        <dl class="finding-meta">
+          <div>
+            <dt>작업 식별자</dt>
+            <dd>{{ job.id }}</dd>
+          </div>
+          <div>
+            <dt>대상</dt>
+            <dd>{{ job.target_name }} · {{ job.target_url }}</dd>
+          </div>
+          <div>
+            <dt>진단 시작</dt>
+            <dd>{{ view.created }}</dd>
+          </div>
+          <div>
+            <dt>HTTP 요청</dt>
+            <dd>
+              {{ job.get('summary', {}).get('request_count', '기록 없음') }}
+            </dd>
+          </div>
+        </dl>
+        {% if job.error %}
+        <div class="notice">
+          <b>진단 오류</b>
+          <p>{{ job.error }}</p>
+        </div>
+        {% endif %}
+        <h3>도구 비교</h3>
+        <p>
+          각 도구의 분석 방식과 인증·검사 범위가 다릅니다. 경고 수를 단순
+          합산하거나 도구 정확도 순위로 해석하지 않습니다. 전체 정답표가 없어
+          FPR을 산출하지 않습니다.
+        </p>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>도구 / 버전</th>
+                <th>실행 상태</th>
+                <th>발견·경고</th>
+                <th>조건과 제한</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for tool in view.tools %}
+              <tr>
+                <td>
+                  {{ tool.tool }}<br /><small
+                    >{{ tool.get('version', '버전 기록 없음') }}</small
+                  >
+                </td>
+                <td>{{ view.states.get(tool.status, tool.status) }}</td>
+                <td>{{ tool.get('count', '—') }}</td>
+                <td>
+                  {{ tool.get('note') or tool.get('error') or tool.get('reason',
+                  '조건 기록 없음') }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="fine">
+          빠른 리포트에는 생성 시점에 수집된 결과만 포함됩니다. 표에 없는 비교
+          도구는 미선택 또는 결과 대기일 수 있습니다. 상태가 실패·건너뜀인
+          도구의 0건은 ‘취약점 없음’을 뜻하지 않습니다.
+        </p>
+        <h3>AI 보조 분석 <span class="status">{{ view.ai_label }}</span></h3>
+        {% if kind == 'quick' %}
+        <p>
+          AI를 기다리지 않는 리포트입니다. 통합 리포트에서 결과를 확인하세요.
+        </p>
+        {% else %}
+        <p>
+          {{ ai.get('provider', '공급자 없음') }} · {{ ai.get('model', '모델
+          없음') }} · {{ ai.get('mode', 'standard') }}
+        </p>
+        <p class="notice">
+          AI 의견은 미검증 가설이며 확정 취약점이나 수정 완료 판정이 아닙니다.
+        </p>
+        {% if ai.get('fallback') %}
+        <p>
+          AI를 사용할 수 없거나 일부 단계가 실패하여 일반 진단 결과를
+          유지했습니다.
+        </p>
+        {% endif %} {% if ai.get('error') %}
+        <p>{{ ai.error }}</p>
+        {% endif %} {% if view.ai_review.summary %}
+        <p>{{ view.ai_review.summary }}</p>
+        {% endif %} {% for finding in view.ai_review.findings %}
+        <details class="ai-item" data-print-expand>
+          <summary>
+            {{ finding.get('path', '위치 미지정') }}:{{ finding.get('line', '')
+            }} · AI 검토 의견 {{ loop.index }}
+          </summary>
+          <div class="finding-body">
+            <h4>위험 가설</h4>
+            <p>{{ finding.get('risk', '') }}</p>
+            <h4>수정 제안</h4>
+            <pre>{{ finding.get('fix', '') }}</pre>
+            <h4>검증 제안</h4>
+            <p>{{ finding.get('test_plan', '') }}</p>
+          </div>
+        </details>
+        {% endfor %} {% if not view.ai_review.summary and not
+        view.ai_review.findings and not ai.get('error') %}
+        <p>표시할 AI 검토 의견이 없습니다.</p>
+        {% endif %} {% for phase in ai.get('phases', []) %}
+        <details class="raw-evidence">
+          <summary>
+            {{ phase.phase }} · {{ view.states.get(phase.status, phase.status)
+            }} · 단계 원문
+          </summary>
+          <pre>{{ phase|pretty }}</pre>
+        </details>
+        {% endfor %} {% if ai.get('source_manifest') %}
+        <details class="raw-evidence">
+          <summary>검토한 소스 발췌의 SHA-256</summary>
+          <pre>{{ ai.source_manifest|pretty }}</pre>
+        </details>
+        {% endif %} {% endif %}
+        <h3 class="raw-heading">원본 도구 경고</h3>
+        <p class="fine raw-heading">
+          원문은 HTML에서 펼쳐 볼 수 있습니다. 인쇄본에는 중복·대용량 원문을
+          제외하고 요약과 요청 목록을 수록합니다.
+        </p>
+        {% for tool in comparison %}
+        <details class="raw-evidence">
+          <summary>{{ tool.tool }} · 원본 경고</summary>
+          <pre>{{ tool.get('alerts', [])|pretty }}</pre>
+        </details>
+        {% endfor %}
+        <details class="raw-evidence license">
+          <summary>글꼴 및 문서 정보</summary>
+          <p>
+            바탕체 계열 Nanum Myeongjo를 HTML 내부에 포함했습니다. 네트워크 연결
+            없이 읽을 수 있습니다. 출력 내용은 자동 생성되었으며 담당자의
+            검토·승인은 별도입니다.
+          </p>
+          <pre>{{ assets.license }}</pre>
+        </details>
+      </section>
+    </main>
+    <script type="application/json" id="report-snapshot">
+      {{ snapshot|tojson }}
+    </script>
+    <!-- prettier-ignore -->
+    <script>{{ assets.js|safe }}</script>
+  </body>
+</html>

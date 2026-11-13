@@ -1,0 +1,9 @@
+.venv
+.local
+.git
+**/__pycache__
+**/*.egg-info
+.env*
+dist
+build
+.ruff_cache

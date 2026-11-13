@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "secureflow-lab"
+version = "0.2.0"
+description = "Evidence-based local web security assessment with optional AI review"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = [
+  "bandit==1.9.4", "Flask==3.1.3", "cryptography==50.0.2", "waitress==3.0.2",
+]
+
+[project.optional-dependencies]
+dev = ["ruff==0.14.14", "build==1.4.0", "playwright==1.65.1"]
+
+[project.scripts]
+secureflow = "secureflow.runner:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+secureflow = ["templates/*.html", "static/*.css", "static/*.js", "static/fonts/*", "resources/*.yaml", "resources/*.json"]
+"secureflow.lab" = ["*.json"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = [".local", "src/secureflow/lab/cases"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

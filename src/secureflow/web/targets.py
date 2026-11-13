@@ -1,0 +1,78 @@
+import uuid
+from pathlib import Path
+
+from flask import jsonify, request
+
+from ..config import source_roots
+from ..net import validate_url
+
+
+def install_targets(app, store, authenticated):
+    @app.get("/api/targets")
+    def targets():
+        return jsonify(targets=store.targets())
+
+    def target_data(data, old=None):
+        name = str(data.get("name", "")).strip()
+        if not name or len(name) > 120:
+            raise ValueError("Target name required (maximum 120 characters)")
+        url = str(data.get("url", "")).rstrip("/")
+        validate_url(url)
+        source = str(data.get("source_path", "")).strip()
+        if source:
+            resolved = Path(source).resolve()
+            roots = source_roots()
+            if not resolved.is_dir() or not any(
+                resolved == root or resolved.is_relative_to(root) for root in roots
+            ):
+                raise ValueError("Source directory is outside approved source roots")
+            source = str(resolved)
+        username = str(data.get("username", "")).strip()[:200]
+        password = str(data.get("password", ""))
+        if len(password) > 512:
+            raise ValueError("Target password exceeds 512 characters")
+        credential = (
+            store.vault.encrypt(password.encode()).decode()
+            if password
+            else old["credential"]
+            if old
+            else ""
+        )
+        if bool(username) != bool(credential):
+            raise ValueError("Supply both a target username and password")
+        return name, url, source, username, credential
+
+    @app.post("/api/targets")
+    def add_target():
+        identifier = uuid.uuid4().hex
+        values = target_data(request.get_json() or {})
+        with store.connect() as db:
+            db.execute("INSERT INTO targets VALUES (?,?,?,?,?,?)", (identifier, *values))
+        store.audit("target_created", authenticated(), identifier)
+        return jsonify(id=identifier), 201
+
+    @app.put("/api/targets/<identifier>")
+    def update_target(identifier):
+        old = next((t for t in store.targets(private=True) if t["id"] == identifier), None)
+        if not old:
+            return jsonify(error="Target not found"), 404
+        values = target_data(request.get_json() or {}, old)
+        with store.connect() as db:
+            db.execute(
+                "UPDATE targets SET name=?,url=?,source_path=?,username=?,credential=? WHERE id=?",
+                (*values, identifier),
+            )
+        store.audit("target_updated", authenticated(), identifier)
+        return jsonify(ok=True)
+
+    @app.delete("/api/targets/<identifier>")
+    def remove_target(identifier):
+        if any(
+            j["target_id"] == identifier and j["status"] in ("queued", "running")
+            for j in store.jobs()
+        ):
+            return jsonify(error="Target has an active job"), 409
+        with store.connect() as db:
+            changed = db.execute("DELETE FROM targets WHERE id=?", (identifier,)).rowcount
+        store.audit("target_deleted", authenticated(), identifier)
+        return jsonify(ok=True) if changed else (jsonify(error="Target not found"), 404)

@@ -1,0 +1,13 @@
+services:
+  workflow:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    network_mode: none
+    volumes:
+      - ../.local/artifacts:/app/.local/artifacts
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    cpus: 1

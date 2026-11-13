@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SecureFlow · 실습 평가 보고서</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        color: #dde5ef;
+        background: #0c1423;
+      }
+      body {
+        max-width: 1100px;
+        margin: auto;
+        padding: 44px 24px;
+      }
+      h1 {
+        font-size: 44px;
+        letter-spacing: -2px;
+      }
+      h2 {
+        font-size: 21px;
+      }
+      p {
+        line-height: 1.7;
+        color: #b8c8dc;
+      }
+      .eyebrow {
+        color: #65dbbf;
+        font-size: 12px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+      }
+      .stat,
+      article {
+        background: #152238;
+        border: 1px solid #2a3b54;
+        border-radius: 14px;
+        padding: 24px;
+        margin: 18px 0;
+      }
+      .stat strong {
+        display: block;
+        font-size: 32px;
+        color: #77e3c5;
+      }
+      .badge {
+        font-size: 12px;
+        padding: 5px 9px;
+        border-radius: 20px;
+        background: #33455d;
+        display: inline-block;
+      }
+      pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        background: #0c1423;
+        padding: 16px;
+        border-radius: 8px;
+        font-size: 13px;
+      }
+      a {
+        color: #78dec7;
+      }
+      button {
+        background: #243956;
+        color: white;
+        border: 1px solid #54708d;
+        padding: 10px 16px;
+        border-radius: 7px;
+        cursor: pointer;
+        margin: 6px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      td,
+      th {
+        text-align: left;
+        border-bottom: 1px solid #31445d;
+        padding: 12px;
+      }
+      summary {
+        cursor: pointer;
+        color: #88bfff;
+      }
+      @media print {
+        body {
+          background: white;
+          color: black;
+        }
+        article,
+        .stat,
+        pre {
+          background: #f5f5f5;
+          color: black;
+          break-inside: avoid;
+        }
+        p {
+          color: #333;
+        }
+        button {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="eyebrow">SECUREFLOW / EVIDENCE FIRST</div>
+      <h1>진단에서 수정까지.</h1>
+      <p>Bandit SAST → 대조군 기반 DAST → 근거 연결 → 시큐어코딩 가이드</p>
+    </header>
+    <div class="grid">
+      <div class="stat">검증된 발견<strong>{{ confirmed }}</strong></div>
+      <div class="stat">OWASP 2025 범주<strong>{{ categories }}</strong></div>
+      <div class="stat">
+        FPR 감소<strong
+          >{{ '%.1f'|format(run.metrics.fpr_reduction_pp) }}%p</strong
+        >
+      </div>
+      <div class="stat">
+        검증 커버리지<strong
+          >{{ '%.0f'|format(run.metrics.coverage * 100) }}%</strong
+        >
+      </div>
+    </div>
+    <p>{{ run.metrics.limitation }} 미재현 경고는 원본에 보존합니다.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>평가 방식</th>
+          <th>TP</th>
+          <th>FP</th>
+          <th>TN</th>
+          <th>FN</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for key, label in [('baseline', 'Bandit 원본'), ('validated', '동적
+        검증 완료'), ('conservative', '미확인 경고 유지')] %}
+        <tr>
+          <td>{{ label }}</td>
+          {% for metric in ['tp', 'fp', 'tn', 'fn'] %}
+          <td>{{ run.metrics[key][metric] }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p>
+      FPR = FP/(FP+TN), FDR = FP/(TP+FP). 단위는 엔드포인트·취약점 유형
+      쌍입니다.
+    </p>
+    <p>
+      실행: {{ run.run_id }} · Bandit {{ run.versions.bandit }} · HTTP {{
+      run.request_count }}회
+    </p>
+    <nav>
+      <button data-filter="all">전체</button
+      ><button data-filter="confirmed">검증 완료</button
+      ><button data-filter="not_reproduced">미재현</button
+      ><button data-filter="inconclusive">미확인</button
+      ><button id="print-report">인쇄 / PDF 저장</button>
+    </nav>
+    {% for card in cards %}
+    <article data-state="{{ card.finding.state }}">
+      <div class="eyebrow">
+        {{ card.finding.id }} · {{ card.rule.owasp }} · {{ card.rule.cwe }}
+      </div>
+      <h2>
+        {{ card.rule.title }}
+        <span class="badge">{{ card.finding.state }}</span>
+      </h2>
+      <p>
+        {{ card.rule.impact if card.finding.state == 'confirmed' else '이
+        입력에서 재현하지 못했거나 검증이 불완전합니다. 안전 판정이 아닙니다.'
+        }}
+      </p>
+      <p>
+        우선순위: {{ card.rule.severity }} (규칙 기반, CVSS 아님) · 소스: {{
+        card.finding.source }}
+      </p>
+      <details>
+        <summary>정적 근거와 실제 HTTP 증거</summary>
+        <pre>{{ card.signals }}</pre>
+        <pre>{{ card.evidence|pretty }}</pre>
+      </details>
+      <h3>수정 가이드</h3>
+      <p>{{ card.rule.advice }}</p>
+      <pre>{{ card.rule.code }}</pre>
+      <a href="{{ card.rule.reference }}" rel="noreferrer">OWASP 수정 지침</a>
+    </article>
+    {% endfor %}
+    <script>
+      document.querySelectorAll("[data-filter]").forEach((button) =>
+        button.addEventListener("click", () => {
+          document.querySelectorAll("article").forEach((article) => {
+            article.hidden =
+              button.dataset.filter !== "all" &&
+              article.dataset.state !== button.dataset.filter;
+          });
+        }),
+      );
+      document
+        .querySelector("#print-report")
+        .addEventListener("click", () => window.print());
+    </script>
+  </body>
+</html>

@@ -1,0 +1,6 @@
+FROM secureflow:local
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir playwright==1.65.1 && python -m playwright install --with-deps chromium
+COPY scripts ./scripts
+ENTRYPOINT ["python", "scripts/check_report.py"]
