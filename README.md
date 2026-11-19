@@ -24,6 +24,10 @@ Python 3.12+ · Linux / WSL2 · MIT
 로컬 주소와 `SECUREFLOW_ALLOWED_HOSTS`에 등록한 사설 IP도 지원합니다. HTTPS는 신뢰할 수 있는 인증서가 필요합니다.
 연결한 소스가 있으면 Semgrep 검사 결과도 두 리포트에 포함됩니다.
 
+사이트 없이 검사하려면 프로젝트를 `.local/sources/` 아래에 두고 **진단 대상 → 대상 등록 → 소스코드만 검사**에서 폴더 경로를 입력하세요.
+Bandit은 Python을, Semgrep은 제공된 규칙으로 JavaScript·TypeScript를 검사합니다. Semgrep 실행에는 Docker가 필요합니다.
+도구 결과는 미검증 후보로 표시하고, 선택한 AI 검토는 통합 리포트에 포함합니다.
+
 ## Quick start
 
 요구 사항: **Python 3.12 이상, Git, 실행 중인 Docker Engine**.

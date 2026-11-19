@@ -5,11 +5,37 @@ import time
 import uuid
 from pathlib import Path
 
+from .runner import sast
+
 ROOT = Path(__file__).resolve().parent
 SEMGREP_IMAGE = (
     "semgrep/semgrep@sha256:cc1b68266f267878b39739373ea9985b9a78e5d64497dd875c8de100b22695ed"
 )
 ZAP_IMAGE = "ghcr.io/zaproxy/zaproxy@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af"
+
+
+def bandit_scan(source, output):
+    root = Path(source)
+    raw = sast(root, output, use_project_config=False)
+    alerts = [
+        {
+            "id": item["test_id"],
+            "path": str(Path(item["filename"]).relative_to(root)),
+            "line": item["line_number"],
+            "severity": item["issue_severity"],
+            "message": item["issue_text"],
+            "cwe": f"CWE-{item['issue_cwe']['id']}" if item.get("issue_cwe") else "",
+            "state": "unverified",
+        }
+        for item in raw["results"]
+    ]
+    return {
+        "tool": "Bandit",
+        "status": "complete",
+        "alerts": alerts,
+        "count": len(alerts),
+        "note": "Python 정적 분석. 탐지된 후보는 코드 맥락 검토가 필요합니다.",
+    }
 
 
 def command_result(args, output, name, timeout):
@@ -89,11 +115,12 @@ def semgrep_scan(source, output):
     alerts = [
         dict(
             id=a["check_id"],
-            path=a["path"],
+            path=a["path"].removeprefix("/src/"),
             line=a["start"]["line"],
             severity=a["extra"]["severity"],
             message=a["extra"]["message"],
             owasp=a["extra"].get("metadata", {}).get("owasp"),
+            cwe=a["extra"].get("metadata", {}).get("cwe"),
             state="unverified",
         )
         for a in raw.get("results", [])

@@ -20,6 +20,17 @@ def source_roots() -> list[Path]:
     return [Path(value).resolve() for value in configured.split(",") if value.strip()]
 
 
+def validate_source_directory(value: str) -> Path:
+    path = Path(value).resolve()
+    if (
+        not value
+        or not path.is_dir()
+        or not any(path.is_relative_to(root) for root in source_roots())
+    ):
+        raise ValueError("소스 폴더를 허용된 경로(.local/sources 등) 안에 지정하세요.")
+    return path
+
+
 def managed_lab() -> dict:
     path = workspace() / "lab.json"
     return json.loads(path.read_text()) if path.is_file() else {}

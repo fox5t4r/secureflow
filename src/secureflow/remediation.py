@@ -90,6 +90,13 @@ app.use((err, req, res, next) => {
 
 
 def guidance(finding):
+    if finding.get("state") == "unverified":
+        return {
+            "action": "표시된 파일과 줄에서 데이터 흐름, 보호 조치, 실행 조건을 검토하세요.",
+            "owner": "담당 개발팀",
+            "acceptance": "실제 문제가 확인되면 수정 전후의 코드를 검토하고 정적 분석과 관련 테스트를 다시 실행하세요.",
+            "code": "",
+        }
     return JUICE_GUIDES.get(
         finding.get("id"),
         {

@@ -36,7 +36,10 @@
           <dl class="metadata">
             <div>
               <dt>진단 대상</dt>
-              <dd>{{ job.target_url|truncate(110) }}</dd>
+              <dd>
+                {{ '등록된 소스 폴더 · 정적 분석' if view.source_only else
+                job.target_url|truncate(110) }}
+              </dd>
             </div>
             <div>
               <dt>진단 시작</dt>
@@ -56,12 +59,20 @@
         >
           <p class="kicker">종합 판단</p>
           <h2>{{ view.verdict }}</h2>
+          {% if not view.source_only %}
           <p>
             {{ findings|length }}개 검사 항목 중 {{ view.confirmed }}건 검증 ·
             {{ view.not_reproduced }}건 미재현 · {{ view.unresolved }}건 미확인
           </p>
+          {% endif %}
         </div>
         <div class="metrics" aria-label="핵심 지표">
+          {% if view.source_only %}
+          <div>
+            <span>정적 분석 후보</span
+            ><strong>{{ findings|length }}<small>건</small></strong>
+          </div>
+          {% else %}
           <div>
             <span>검증된 발견</span
             ><strong>{{ view.confirmed }}<small>건</small></strong>
@@ -76,6 +87,7 @@
             <span>발견된 OWASP 범주</span
             ><strong>{{ view.categories }}<small>/ 10</small></strong>
           </div>
+          {% endif %}
           <div>
             <span>AI 보조 분석</span
             ><strong class="text-metric"
@@ -83,6 +95,7 @@
             >
           </div>
         </div>
+        {% if not view.source_only %}
         <section class="priority-section" aria-labelledby="priority-title">
           <div class="section-line">
             <h2 id="priority-title">우선 조치</h2>
@@ -113,16 +126,18 @@
           재검증하세요. 이 보고서에는 수정 완료 또는 배포 승인 판정이 포함되지
           않습니다.
         </div>
+        {% endif %}
         <div class="scope-note">
-          <b>판단 범위</b> 자체 실습 환경의 관측 결과입니다. 미재현은 안전
-          판정이 아니며, 도구 경고와 AI 의견은 검증 건수에 합산하지 않습니다.
-          범주 수는 전체 탐지율이 아닙니다. {% if job.error %}<br /><b
-            >진단 실패</b
-          >
-          일부 결과만 확보되었습니다. 실패 원인은 분석 부록에서 확인하세요.{%
-          endif %} {% if view.tool_issues %}<br /><b>검사 공백</b> 완료되지 않은
-          도구 {{ view.tool_issues }}개. 세부 상태는 분석 부록에 기재했습니다.{%
-          endif %} {% if kind == 'quick' %}<br />이 문서는 기본 검사 시점의
+          <b>판단 범위</b> {% if view.source_only %}Python과
+          JavaScript·TypeScript에 대한 규칙 기반 소스 검사입니다. 정적 분석
+          후보에는 코드 검토가 필요합니다.{% else %} 자체 실습 환경의 관측
+          결과입니다. 미재현은 안전 판정이 아니며, 도구 경고와 AI 의견은 검증
+          건수에 합산하지 않습니다. 범주 수는 전체 탐지율이 아닙니다. {% endif
+          %}{% if job.error %}<br /><b>진단 실패</b> 일부 결과만 확보되었습니다.
+          실패 원인은 분석 부록에서 확인하세요.{% endif %} {% if
+          view.tool_issues %}<br /><b>검사 공백</b> 완료되지 않은 도구 {{
+          view.tool_issues }}개. 세부 상태는 분석 부록에 기재했습니다.{% endif
+          %} {% if kind == 'quick' %}<br />이 문서는 기본 검사 시점의
           스냅샷입니다. 진행 중인 비교 도구·AI 결과는 통합 리포트에서
           확인하세요.{% endif %}
         </div>
@@ -138,9 +153,11 @@
         </div>
         <h2 class="page-title">무엇부터 수정할 것인가</h2>
         <p class="lead">
-          검증된 항목을 먼저 배치했습니다. 담당 영역은 제안이며,
+          {{ '정적 분석 후보를 심각도순으로 배치했습니다.' if view.source_only
+          else '검증된 항목을 먼저 배치했습니다.' }} 담당 영역은 제안이며,
           담당자·목표일·완료 여부는 아직 확정하지 않았습니다.
         </p>
+        {% if not view.source_only %}
         <div class="legend">
           <b>P1</b> 검증된 Critical/High · 우선 수정 &nbsp; <b>P2</b> 그 외
           검증된 발견 · 개선 계획 &nbsp; <b>검토</b> 미재현·미확인
@@ -149,6 +166,7 @@
           우선순위는 규칙 심각도를 기준으로 한 작업 순서입니다. CVSS 점수나
           합의된 조치 기한을 의미하지 않습니다.
         </p>
+        {% endif %}
         <div class="table-scroll">
           <table class="action-table">
             <thead>
@@ -244,7 +262,12 @@
               </dl>
               <h3>관측 결과와 입증 범위</h3>
               <p>{{ card.finding.detail }}</p>
-              {% if card.finding.state != 'confirmed' %}
+              {% if card.finding.state == 'unverified' %}
+              <p class="notice">
+                정적 규칙에 일치한 후보입니다. 적용 조건과 코드 문맥을
+                확인하세요.
+              </p>
+              {% elif card.finding.state != 'confirmed' %}
               <p class="notice">
                 이 항목은 확정 취약점이 아닙니다. 현재 입력에서 재현하지
                 못했거나 검증이 불완전합니다. 수정 필요성은 추가 검토로
@@ -253,13 +276,16 @@
               {% endif %}
               <h3>수정 가이드</h3>
               <p>{{ card.guide.action }}</p>
+              {% if card.guide.code %}
               <p class="fine">
                 적용 예시 · 실제 코드 구조, 미들웨어, ORM 버전에 맞게 수정해야
                 합니다. 검토·적용·재검증은 아직 수행하지 않았습니다.
               </p>
               <pre class="code-example"><code>{{ card.guide.code }}</code></pre>
+              {% endif %}
               <h3>재검증 완료 조건</h3>
               <p>{{ card.guide.acceptance }}</p>
+              {% if not view.source_only %}
               <h3>요청·응답 근거</h3>
               {% if card.finding.evidence %}
               <div class="table-scroll">
@@ -301,7 +327,7 @@
                 전체 요청·응답 원문은 HTML 보고서의 ‘원본 요청·응답’ 토글에
                 포함되어 있습니다.
               </p>
-              {% if card.finding.reference and
+              {% endif %} {% if card.finding.reference and
               card.finding.reference.startswith('https://') %}
               <p class="fine">
                 참고:
@@ -331,18 +357,23 @@
           </div>
           <div>
             <dt>대상</dt>
-            <dd>{{ job.target_name }} · {{ job.target_url }}</dd>
+            <dd>
+              {{ job.target_name }}{% if job.target_url %} · {{ job.target_url
+              }}{% endif %}
+            </dd>
           </div>
           <div>
             <dt>진단 시작</dt>
             <dd>{{ view.created }}</dd>
           </div>
+          {% if not view.source_only %}
           <div>
             <dt>HTTP 요청</dt>
             <dd>
               {{ job.get('summary', {}).get('request_count', '기록 없음') }}
             </dd>
           </div>
+          {% endif %}
         </dl>
         {% if job.error %}
         <div class="notice">

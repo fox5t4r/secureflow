@@ -33,6 +33,7 @@ const statusLabels = {
   inconclusive: "미확인",
   unknown: "미확인",
   candidate: "검토 필요",
+  unverified: "미검증",
   partial: "부분 완료",
 };
 const categoryNames = [
@@ -327,11 +328,17 @@ function renderOverview() {
     const card = node("div", "mini-target");
     card.append(
       node("h3", "", target.name),
-      node("p", "", target.url),
+      node("p", "", target.url || target.source_path),
       node(
         "small",
         "",
-        target.has_credentials ? "테스트 계정 연결됨" : "실습 계정 자동 생성",
+        target.mode === "source"
+          ? "소스코드만 검사"
+          : target.mode === "site"
+            ? "응답 헤더 확인"
+            : target.has_credentials
+              ? "테스트 계정 연결됨"
+              : "실습 계정 자동 생성",
       ),
     );
     targets.append(card);
@@ -357,12 +364,19 @@ function renderTargets() {
     top.append(logo, node("h2", "", target.name));
     const properties = node("dl");
     for (const [label, value] of [
-      ["애플리케이션 URL", target.url],
-      ["검사 방식", target.mode === "site" ? "응답 헤더" : "Juice Shop 전용"],
+      ...(target.url ? [["애플리케이션 URL", target.url]] : []),
+      [
+        "검사 방식",
+        target.mode === "source"
+          ? "소스코드만 검사"
+          : target.mode === "site"
+            ? "응답 헤더"
+            : "Juice Shop 전용",
+      ],
       ["소스코드", target.source_path || "미연결"],
       [
         "테스트 계정",
-        target.mode === "site"
+        ["source", "site"].includes(target.mode)
           ? "사용 안 함"
           : target.has_credentials
             ? `${target.username || "계정"} · 연결됨`
@@ -523,18 +537,32 @@ function openJobDialog(targetId) {
   $("#job-dialog").showModal();
 }
 function syncTargetMode() {
-  const site = $("#target-mode").value === "site";
-  $("#target-dialog .credential-fields").hidden = site;
-  $("#target-username").disabled = site;
-  $("#target-password").disabled = site;
+  const mode = $("#target-mode").value;
+  const sourceOnly = mode === "source";
+  const url = $("#target-url");
+  url.hidden = url.disabled = sourceOnly;
+  url.required = !sourceOnly;
+  $('label[for="target-url"]').hidden = sourceOnly;
+  $("#target-url-help").hidden = sourceOnly;
+  $("#target-source").required = sourceOnly;
+  $("#target-source-optional").hidden = sourceOnly;
+  $("#target-source-help").hidden = !sourceOnly;
+  const noCredentials = mode !== "juice";
+  $("#target-dialog .credential-fields").hidden = noCredentials;
+  $("#target-username").disabled = noCredentials;
+  $("#target-password").disabled = noCredentials;
 }
 function syncJobTarget() {
   const target = state.targets.find(
     (entry) => String(entry.id) === $("#job-target").value,
   );
   const site = target?.mode === "site";
-  $("#job-compare").disabled = site;
+  const sourceOnly = target?.mode === "source";
+  const compare = $("#job-compare");
+  compare.disabled = site || sourceOnly;
+  compare.closest("label").hidden = sourceOnly;
   $("#job-site-help").hidden = !site;
+  $("#job-source-help").hidden = !sourceOnly;
 }
 async function openJob(id) {
   state.selectedJob = id;
@@ -829,6 +857,14 @@ async function loadDetail(id) {
   state.detailFingerprint = fingerprint;
   const job = data.job || data;
   const findings = data.findings || [];
+  const sourceOnly = job.target_mode === "source";
+  $("#coverage-panel").hidden = sourceOnly;
+  $("#findings-title").textContent = sourceOnly
+    ? "정적 분석 후보"
+    : "발견 사항과 개선 가이드";
+  $("#findings-help").textContent = sourceOnly
+    ? "파일과 줄 번호를 확인해 후보가 실제 문제인지 검토하세요."
+    : "근거와 재현 범위를 확인한 뒤 우선순위를 판단하세요.";
   $("#detail-title").textContent = job.target_name || "진단 결과";
   $("#detail-meta").textContent =
     `작업 ${job.id || id} · ${formatTime(job.created_at)} 시작`;
@@ -876,8 +912,12 @@ async function loadDetail(id) {
   if (!findings.length)
     list.append(
       emptyState(
-        "발견 사항 대기 중",
-        "기본 진단이 완료되면 근거와 개선 가이드가 표시됩니다.",
+        sourceOnly && job.quick_ready
+          ? "수집된 정적 분석 후보가 없습니다"
+          : "발견 사항 대기 중",
+        sourceOnly && job.quick_ready
+          ? "도구 실행 상태와 지원 언어를 확인하세요."
+          : "기본 진단이 완료되면 근거와 개선 가이드가 표시됩니다.",
         "◇",
       ),
     );

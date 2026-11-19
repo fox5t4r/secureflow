@@ -1,9 +1,8 @@
 import uuid
-from pathlib import Path
 
 from flask import jsonify, request
 
-from ..config import source_roots
+from ..config import validate_source_directory
 from ..net import validate_url
 from ..site_review import site_endpoint
 
@@ -24,19 +23,20 @@ def install_targets(app, store, authenticated):
         elif mode == "juice":
             url = url.rstrip("/")
             validate_url(url)
+        elif mode == "source":
+            if url:
+                raise ValueError("소스코드 검사에는 URL을 입력하지 않습니다.")
         else:
             raise ValueError("지원하지 않는 검사 방식입니다.")
         source = str(data.get("source_path", "")).strip()
-        if source:
-            resolved = Path(source).resolve()
-            roots = source_roots()
-            if not resolved.is_dir() or not any(
-                resolved == root or resolved.is_relative_to(root) for root in roots
-            ):
-                raise ValueError("Source directory is outside approved source roots")
-            source = str(resolved)
+        if source or mode == "source":
+            source = str(validate_source_directory(source))
         username = str(data.get("username", "")).strip()[:200]
         password = str(data.get("password", ""))
+        if mode != "juice":
+            if username or password:
+                raise ValueError("테스트 계정은 Juice Shop 실습에만 사용합니다.")
+            return name, url, source, "", "", mode
         if len(password) > 512:
             raise ValueError("Target password exceeds 512 characters")
         credential = (
@@ -48,10 +48,6 @@ def install_targets(app, store, authenticated):
         )
         if bool(username) != bool(credential):
             raise ValueError("Supply both a target username and password")
-        if mode == "site":
-            if username or password:
-                raise ValueError("일반 사이트 점검에는 테스트 계정을 사용하지 않습니다.")
-            return name, url, source, "", "", mode
         return name, url, source, username, credential, mode
 
     @app.post("/api/targets")

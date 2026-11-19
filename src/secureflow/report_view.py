@@ -13,6 +13,7 @@ STATES = {
     "confirmed": "검증 완료",
     "not_reproduced": "미재현",
     "inconclusive": "미확인",
+    "unverified": "정적 분석 후보",
     "complete": "완료",
     "completed": "완료",
     "failed": "실패",
@@ -102,8 +103,17 @@ def report_view(job, findings, comparison, ai, kind):
         str(c["finding"].get("severity", "")).upper() in ("CRITICAL", "HIGH") for c in confirmed
     )
     site_mode = job.get("target_mode") == "site"
+    source_only = job.get("target_mode") == "source"
     if job.get("error"):
         verdict = "진단이 불완전합니다. 실패 원인 확인과 재실행이 필요합니다."
+    elif source_only:
+        successful = sum(tool["status"] == "complete" for tool in comparison)
+        if not successful:
+            verdict = "정적 분석을 완료하지 못했습니다. 도구별 오류를 확인하세요."
+        else:
+            verdict = f"정적 분석 후보 {len(findings)}건. 코드 맥락을 검토하세요."
+            if successful < len(comparison):
+                verdict = "일부 도구 실패. " + verdict
     elif site_mode:
         verdict = (
             "콘텐츠 유형 추측 방지 헤더를 추가하세요."
@@ -118,21 +128,25 @@ def report_view(job, findings, comparison, ai, kind):
         verdict = f"취약점 {len(confirmed)}건 확인. 담당자 지정과 개선 계획이 필요합니다."
     else:
         verdict = "검증된 취약점이 없습니다. 이번 결과만으로 안전을 판단할 수 없습니다."
-    tools = [
-        {
-            "tool": "SecureFlow HTTP 설정 점검" if site_mode else "SecureFlow DAST",
-            "status": "failed"
-            if job.get("error")
-            else "complete"
-            if findings or job.get("summary", {}).get("tested") == 0
-            else "inconclusive",
-            "count": len(confirmed),
-            "note": "등록한 경로에 비인증 HEAD 요청 1회. 콘텐츠 유형 추측 방지 헤더만 확인합니다."
-            if site_mode
-            else "앱 전용 대조 요청 기반 검증. 수치는 검증된 발견 수입니다.",
-        },
-        *comparison,
-    ]
+    tools = (
+        list(comparison)
+        if source_only
+        else [
+            {
+                "tool": "SecureFlow HTTP 설정 점검" if site_mode else "SecureFlow DAST",
+                "status": "failed"
+                if job.get("error")
+                else "complete"
+                if findings or job.get("summary", {}).get("tested") == 0
+                else "inconclusive",
+                "count": len(confirmed),
+                "note": "등록한 경로에 비인증 HEAD 요청 1회. 콘텐츠 유형 추측 방지 헤더만 확인합니다."
+                if site_mode
+                else "앱 전용 대조 요청 기반 검증. 수치는 검증된 발견 수입니다.",
+            },
+            *comparison,
+        ]
+    )
     issues = sum(t.get("status") not in ("complete", "completed") for t in tools)
     ai_state = ai.get("status", "disabled")
     return {
@@ -144,6 +158,7 @@ def report_view(job, findings, comparison, ai, kind):
         "not_reproduced": counts["not_reproduced"],
         "counts": counts,
         "verdict": verdict,
+        "source_only": source_only,
         "tools": tools,
         "tool_issues": issues,
         "states": STATES,

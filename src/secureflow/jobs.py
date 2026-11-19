@@ -7,7 +7,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 from .ai import analyze
-from .comparators import semgrep_scan, zap_scan
+from .comparators import bandit_scan, semgrep_scan, zap_scan
+from .config import validate_source_directory
 from .integrated_report import build_report
 from .juice import scan_juice
 from .site_review import review_site, site_endpoint
@@ -34,8 +35,13 @@ class JobEngine:
         mode = target.get("mode", "juice")
         if mode == "site":
             site_endpoint(target["url"])
-            if compare_tools:
-                raise ValueError("일반 사이트 점검에서는 ZAP 비교를 지원하지 않습니다.")
+        if mode == "source":
+            target = {
+                **target,
+                "source_path": str(validate_source_directory(target["source_path"])),
+            }
+        if mode != "juice" and compare_tools:
+            raise ValueError("ZAP 비교는 Juice Shop 실습에만 사용할 수 있습니다.")
         if ai_mode not in ("standard", "deep", "ensemble"):
             raise ValueError("AI mode must be standard, deep, or ensemble")
         with self.lock:
@@ -97,7 +103,9 @@ class JobEngine:
                 "username": target["username"],
                 "password": self.store.vault.decrypt(target["credential"].encode()).decode(),
             }
-        if target.get("mode") == "site":
+        if target.get("mode") == "source":
+            futures = {pool.submit(bandit_scan, target["source_path"], output): "bandit"}
+        elif target.get("mode") == "site":
             futures = {pool.submit(review_site, target["url"]): "dast"}
         else:
             futures = {pool.submit(scan_juice, target["url"], credentials): "dast"}
@@ -146,6 +154,20 @@ class JobEngine:
             job["ai_status"] = result["status"]
         else:
             job["comparison"].append(result)
+            if job.get("target_mode") == "source":
+                for alert in result.get("alerts", []):
+                    job["findings"].append(
+                        {
+                            "id": f"{kind}-{len(job['findings']) + 1}",
+                            "title": f"{result['tool'].split(' + ')[0]} · {alert['id']}",
+                            "source": f"{alert['path']}:{alert['line']}",
+                            "severity": alert["severity"],
+                            "owasp": alert.get("owasp") or "",
+                            "cwe": alert.get("cwe") or "",
+                            "state": "unverified",
+                            "detail": alert["message"],
+                        }
+                    )
 
     @staticmethod
     def _accept_error(job, kind, error):
@@ -162,7 +184,12 @@ class JobEngine:
             job["error"] = message
         else:
             job["comparison"].append(
-                {"tool": kind, "status": "failed", "count": 0, "error": message, "alerts": []}
+                {
+                    "tool": {"sast": "Semgrep CE", "bandit": "Bandit"}.get(kind, kind),
+                    "status": "failed",
+                    "error": message,
+                    "alerts": [],
+                }
             )
 
     def run(self, job, target, ai_enabled, compare_tools, settings):
@@ -177,6 +204,8 @@ class JobEngine:
                 )
                 self._save(job, output, "workers_submitted")
                 required = {"dast", "sast"} if target["source_path"] else {"dast"}
+                if job.get("target_mode") == "source":
+                    required = {"bandit", "sast"}
                 finished = set()
                 for future in as_completed(futures):
                     kind = futures[future]
@@ -189,6 +218,9 @@ class JobEngine:
                     if required <= finished and not job["quick_ready"]:
                         self._write_report(job, output, "quick")
             job["status"] = "failed" if job["error"] else "complete"
+            if job.get("target_mode") == "source":
+                total_completed = sum(tool["status"] == "complete" for tool in job["comparison"])
+                job["status"] = {0: "failed", 1: "partial", 2: "complete"}[total_completed]
             self._write_report(job, output, "final")
         except Exception as error:
             job.update(status="failed", error=f"{type(error).__name__}: {str(error)[:400]}")

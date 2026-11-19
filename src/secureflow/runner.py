@@ -27,8 +27,12 @@ def write_json(path, data):
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def sast(source, output):
+def sast(source, output, *, use_project_config=True):
     command = [sys.executable, "-m", "bandit", "-r", str(source), "-f", "json", "-q"]
+    if not use_project_config:
+        config = output / "bandit.ini"
+        config.write_text("[bandit]\n", encoding="utf-8")
+        command.extend(["--ini", str(config)])
     result = subprocess.run(command, text=True, capture_output=True, timeout=120)
     (output / "bandit.stderr.txt").write_text(result.stderr, encoding="utf-8")
     if result.returncode not in (0, 1):
