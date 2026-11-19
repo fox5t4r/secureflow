@@ -101,8 +101,17 @@ def report_view(job, findings, comparison, ai, kind):
     high = sum(
         str(c["finding"].get("severity", "")).upper() in ("CRITICAL", "HIGH") for c in confirmed
     )
+    site_mode = job.get("target_mode") == "site"
     if job.get("error"):
         verdict = "진단이 불완전합니다. 실패 원인 확인과 재실행이 필요합니다."
+    elif site_mode:
+        verdict = (
+            "콘텐츠 유형 추측 방지 헤더를 추가하세요."
+            if confirmed
+            else "응답 상태 때문에 헤더 설정을 확인하지 못했습니다."
+            if counts["inconclusive"]
+            else "콘텐츠 유형 추측 방지 헤더 설정을 확인했습니다."
+        )
     elif high:
         verdict = f"높은 심각도 {high}건 확인. 우선 수정과 재검증이 필요합니다."
     elif confirmed:
@@ -111,14 +120,16 @@ def report_view(job, findings, comparison, ai, kind):
         verdict = "검증된 취약점이 없습니다. 이번 결과만으로 안전을 판단할 수 없습니다."
     tools = [
         {
-            "tool": "SecureFlow DAST",
+            "tool": "SecureFlow HTTP 설정 점검" if site_mode else "SecureFlow DAST",
             "status": "failed"
             if job.get("error")
             else "complete"
             if findings or job.get("summary", {}).get("tested") == 0
             else "inconclusive",
             "count": len(confirmed),
-            "note": "앱 전용 대조 요청 기반 검증. 수치는 검증된 발견 수입니다.",
+            "note": "등록한 경로에 비인증 HEAD 요청 1회. 콘텐츠 유형 추측 방지 헤더만 확인합니다."
+            if site_mode
+            else "앱 전용 대조 요청 기반 검증. 수치는 검증된 발견 수입니다.",
         },
         *comparison,
     ]

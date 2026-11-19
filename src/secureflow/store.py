@@ -36,6 +36,9 @@ class Store:
             CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT);
             CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY,at REAL,event TEXT,username TEXT,detail TEXT);
             """)
+            db.execute("BEGIN IMMEDIATE")
+            if "mode" not in {row[1] for row in db.execute("PRAGMA table_info(targets)")}:
+                db.execute("ALTER TABLE targets ADD COLUMN mode TEXT NOT NULL DEFAULT 'juice'")
         os.chmod(self.path, 0o600)
 
     @contextmanager

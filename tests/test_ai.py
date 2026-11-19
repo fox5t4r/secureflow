@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from secureflow.ai import analyze, validate_review
 from secureflow.ai.context import source_context
-from secureflow.ai.providers import complete, validate_settings
+from secureflow.ai.providers import complete, connection_status, validate_settings
 from secureflow.net import redact
 
 CONTEXT = [{"path": "search.py", "source": "3: db.query(sql)", "sha256": "fixture"}]
@@ -22,6 +22,22 @@ REVIEW = {"summary": "Source-only hypothesis", "findings": [FINDING]}
 
 
 class AITests(TestCase):
+    def test_connection_uses_configured_cli_outside_service_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cli = Path(directory) / "codex"
+            runtime = cli.with_name("test-runtime")
+            runtime.write_text("#!/bin/sh\nprintf '%s\\n' 'Logged in using ChatGPT'\n")
+            runtime.chmod(0o700)
+            cli.write_text('#!/bin/sh\nexec test-runtime "$@"\n')
+            cli.chmod(0o700)
+            with patch.dict(
+                "os.environ", {"PATH": "/usr/bin:/bin", "SECUREFLOW_CODEX_BIN": str(cli)}
+            ):
+                status = connection_status()["codex"]
+        self.assertTrue(status["installed"])
+        self.assertTrue(status["authenticated"])
+        self.assertTrue(status["subscription"])
+
     def test_ensemble_preserves_agreement_and_single_model_results(self):
         response = {"review": REVIEW, "duration_seconds": 0.1}
         with (

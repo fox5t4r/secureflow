@@ -10,6 +10,7 @@ from .ai import analyze
 from .comparators import semgrep_scan, zap_scan
 from .integrated_report import build_report
 from .juice import scan_juice
+from .site_review import review_site, site_endpoint
 
 
 class JobEngine:
@@ -30,6 +31,11 @@ class JobEngine:
                 store.save_job(job)
 
     def start(self, target, ai_enabled, compare_tools, ai_mode="standard"):
+        mode = target.get("mode", "juice")
+        if mode == "site":
+            site_endpoint(target["url"])
+            if compare_tools:
+                raise ValueError("일반 사이트 점검에서는 ZAP 비교를 지원하지 않습니다.")
         if ai_mode not in ("standard", "deep", "ensemble"):
             raise ValueError("AI mode must be standard, deep, or ensemble")
         with self.lock:
@@ -45,6 +51,7 @@ class JobEngine:
                 "target_id": target["id"],
                 "target_name": target["name"],
                 "target_url": target["url"],
+                "target_mode": mode,
                 "status": "queued",
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "quick_ready": False,
@@ -90,7 +97,10 @@ class JobEngine:
                 "username": target["username"],
                 "password": self.store.vault.decrypt(target["credential"].encode()).decode(),
             }
-        futures = {pool.submit(scan_juice, target["url"], credentials): "dast"}
+        if target.get("mode") == "site":
+            futures = {pool.submit(review_site, target["url"]): "dast"}
+        else:
+            futures = {pool.submit(scan_juice, target["url"], credentials): "dast"}
         if target["source_path"]:
             futures[pool.submit(semgrep_scan, target["source_path"], output)] = "sast"
         else:

@@ -65,16 +65,38 @@ def validate_settings(settings: dict) -> dict:
     return {key: config[key] for key in DEFAULTS}
 
 
+def _cli_executable(provider: str) -> str | None:
+    configured = os.getenv(f"SECUREFLOW_{provider.upper()}_BIN")
+    if configured:
+        # An override belongs to the server operator, never to a dashboard request.
+        return shutil.which(configured) if Path(configured).is_absolute() else None
+    return shutil.which(provider)
+
+
+def _cli_environment(executable: str) -> dict[str, str]:
+    environment = os.environ.copy()
+    for key in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDECODE"):
+        environment.pop(key, None)
+    # npm wrappers may need Node from the same installation directory as the wrapper.
+    parent = str(Path(executable).parent)
+    environment["PATH"] = os.pathsep.join((parent, environment.get("PATH", os.defpath)))
+    return environment
+
+
 def connection_status() -> dict:
     """Report CLI presence/auth only. Never return account identifiers or raw CLI logs."""
     status = {"ollama": {"installed": True, "note": "Connection checked when analysis starts"}}
     for provider, arguments in (("codex", ["login", "status"]), ("claude", ["auth", "status"])):
-        executable = shutil.which(provider)
+        executable = _cli_executable(provider)
         item = {"installed": bool(executable), "authenticated": False}
         if executable:
             try:
                 result = subprocess.run(
-                    [executable, *arguments], capture_output=True, text=True, timeout=10
+                    [executable, *arguments],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    env=_cli_environment(executable),
                 )
                 if provider == "codex":
                     item["authenticated"] = result.returncode == 0
@@ -92,9 +114,7 @@ def connection_status() -> dict:
 def _cli_run(arguments: list[str], prompt: str, directory: Path, timeout: int) -> str:
     # No shell expansion; temporary workspace has no target files/configuration.
     # Auth is reused by the CLI; SecureFlow never reads or exports its tokens.
-    environment = os.environ.copy()
-    for key in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDECODE"):
-        environment.pop(key, None)
+    environment = _cli_environment(arguments[0])
     with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
         process = subprocess.Popen(
             arguments,
@@ -186,9 +206,11 @@ def complete(config: dict, messages: list[dict], model: str, timeout: int = 240)
         finally:
             connection.close()
     else:
-        executable = shutil.which(provider)
+        executable = _cli_executable(provider)
         if not executable:
-            raise RuntimeError(f"Install {provider} and sign in using its official CLI first")
+            raise RuntimeError(
+                f"SecureFlow could not find {provider}. Install it or set SECUREFLOW_{provider.upper()}_BIN to its absolute path."
+            )
         with tempfile.TemporaryDirectory(prefix="secureflow-ai-") as temporary:
             directory = Path(temporary)
             prompt = "\n\n".join(f"{m['role'].upper()}: {m['content']}" for m in messages)

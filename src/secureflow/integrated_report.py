@@ -14,6 +14,7 @@ def build_report(job, findings, comparison, ai, kind):
                 "id",
                 "target_name",
                 "target_url",
+                "target_mode",
                 "created_at",
                 "summary",
                 "error",

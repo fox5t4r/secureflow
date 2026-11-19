@@ -5,6 +5,7 @@ from flask import jsonify, request
 
 from ..config import source_roots
 from ..net import validate_url
+from ..site_review import site_endpoint
 
 
 def install_targets(app, store, authenticated):
@@ -16,8 +17,15 @@ def install_targets(app, store, authenticated):
         name = str(data.get("name", "")).strip()
         if not name or len(name) > 120:
             raise ValueError("Target name required (maximum 120 characters)")
-        url = str(data.get("url", "")).rstrip("/")
-        validate_url(url)
+        url = str(data.get("url", "")).strip()
+        mode = data.get("mode", old["mode"] if old else "juice")
+        if mode == "site":
+            site_endpoint(url)
+        elif mode == "juice":
+            url = url.rstrip("/")
+            validate_url(url)
+        else:
+            raise ValueError("지원하지 않는 검사 방식입니다.")
         source = str(data.get("source_path", "")).strip()
         if source:
             resolved = Path(source).resolve()
@@ -40,14 +48,21 @@ def install_targets(app, store, authenticated):
         )
         if bool(username) != bool(credential):
             raise ValueError("Supply both a target username and password")
-        return name, url, source, username, credential
+        if mode == "site":
+            if username or password:
+                raise ValueError("일반 사이트 점검에는 테스트 계정을 사용하지 않습니다.")
+            return name, url, source, "", "", mode
+        return name, url, source, username, credential, mode
 
     @app.post("/api/targets")
     def add_target():
         identifier = uuid.uuid4().hex
         values = target_data(request.get_json() or {})
         with store.connect() as db:
-            db.execute("INSERT INTO targets VALUES (?,?,?,?,?,?)", (identifier, *values))
+            db.execute(
+                "INSERT INTO targets (id,name,url,source_path,username,credential,mode) VALUES (?,?,?,?,?,?,?)",
+                (identifier, *values),
+            )
         store.audit("target_created", authenticated(), identifier)
         return jsonify(id=identifier), 201
 
@@ -59,7 +74,7 @@ def install_targets(app, store, authenticated):
         values = target_data(request.get_json() or {}, old)
         with store.connect() as db:
             db.execute(
-                "UPDATE targets SET name=?,url=?,source_path=?,username=?,credential=? WHERE id=?",
+                "UPDATE targets SET name=?,url=?,source_path=?,username=?,credential=?,mode=? WHERE id=?",
                 (*values, identifier),
             )
         store.audit("target_updated", authenticated(), identifier)

@@ -358,12 +358,15 @@ function renderTargets() {
     const properties = node("dl");
     for (const [label, value] of [
       ["애플리케이션 URL", target.url],
+      ["검사 방식", target.mode === "site" ? "응답 헤더" : "Juice Shop 전용"],
       ["소스코드", target.source_path || "미연결"],
       [
         "테스트 계정",
-        target.has_credentials
-          ? `${target.username || "계정"} · 연결됨`
-          : "미연결 · 실습 계정 자동 생성",
+        target.mode === "site"
+          ? "사용 안 함"
+          : target.has_credentials
+            ? `${target.username || "계정"} · 연결됨`
+            : "미연결 · 실습 계정 자동 생성",
       ],
     ])
       properties.append(node("dt", "", label), node("dd", "", value));
@@ -489,11 +492,13 @@ function openTargetDialog(target = null) {
     target?.has_credentials,
   );
   if (target) {
+    $("#target-mode").value = target.mode || "juice";
     $("#target-name").value = target.name || "";
     $("#target-url").value = target.url || "";
     $("#target-source").value = target.source_path || "";
     $("#target-username").value = target.username || "";
   }
+  syncTargetMode();
   $("#target-dialog").showModal();
   $("#target-name").focus();
 }
@@ -513,8 +518,23 @@ function openJobDialog(targetId) {
     select.append(option);
   }
   if (targetId !== undefined) select.value = String(targetId);
+  syncJobTarget();
   $("#job-form-error").hidden = true;
   $("#job-dialog").showModal();
+}
+function syncTargetMode() {
+  const site = $("#target-mode").value === "site";
+  $("#target-dialog .credential-fields").hidden = site;
+  $("#target-username").disabled = site;
+  $("#target-password").disabled = site;
+}
+function syncJobTarget() {
+  const target = state.targets.find(
+    (entry) => String(entry.id) === $("#job-target").value,
+  );
+  const site = target?.mode === "site";
+  $("#job-compare").disabled = site;
+  $("#job-site-help").hidden = !site;
 }
 async function openJob(id) {
   state.selectedJob = id;
@@ -940,6 +960,8 @@ $("#add-target-button").addEventListener("click", () => openTargetDialog());
 $("#overview-new-job").addEventListener("click", () => openJobDialog());
 $("#jobs-new-job").addEventListener("click", () => openJobDialog());
 $("#detail-back").addEventListener("click", () => goTo("jobs"));
+$("#target-mode").addEventListener("change", syncTargetMode);
+$("#job-target").addEventListener("change", syncJobTarget);
 $("#target-form").addEventListener("submit", (event) => {
   event.preventDefault();
   const form = event.currentTarget;
@@ -967,7 +989,7 @@ $("#job-form").addEventListener("submit", (event) => {
       body: {
         target_id: $("#job-target").value,
         ai_enabled: $("#job-ai").checked,
-        compare_tools: $("#job-compare").checked,
+        compare_tools: !$("#job-compare").disabled && $("#job-compare").checked,
         ai_mode: $("#job-ai-mode").value,
       },
     });
@@ -1065,7 +1087,15 @@ $("#ai-check-connection").addEventListener("click", async () => {
     $("#ai-connection-status").textContent =
       provider === "ollama"
         ? "Ollama 연결은 분석 실행 시 확인합니다."
-        : `${provider}: ${connection.installed ? "설치됨" : "미설치"} · ${connection.authenticated ? "로그인됨" : "터미널 로그인 필요"}`;
+        : !connection.installed
+          ? `${provider} 실행 파일을 서버에서 찾을 수 없습니다. 설치 경로나 서버 설정을 확인하세요.`
+          : connection.note
+            ? `${provider} 로그인 상태를 읽지 못했습니다. CLI 실행 상태를 확인하세요.`
+            : connection.authenticated
+              ? connection.subscription
+                ? `${provider} 구독 계정 로그인 확인됨`
+                : `${provider} CLI 로그인 확인됨`
+              : `${provider} CLI 터미널 로그인이 필요합니다.`;
   } catch (error) {
     toast(error.message, true);
   } finally {

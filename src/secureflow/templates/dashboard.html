@@ -262,10 +262,9 @@
             <div class="notice">
               <span aria-hidden="true">ⓘ</span>
               <div>
-                현재 동적 진단은 로컬 OWASP Juice Shop 어댑터를 지원합니다. 임의
-                사이트의 자동 진단을 보장하지 않습니다.<br />계정 정보는 대상
-                앱의 인증 검사에 사용되며 비밀번호는 조회 화면과 리포트에
-                표시되지 않습니다.
+                자체 웹앱이나 공개 도메인은 일반 사이트로 등록해 응답 헤더를
+                확인할 수 있습니다. Juice Shop 전용 실습 대상에는 테스트 계정을
+                연결할 수 있습니다.
               </div>
             </div>
             <div id="target-list" class="target-grid"></div>
@@ -593,7 +592,13 @@
           placeholder="예: OWASP Juice Shop"
           required
           maxlength="120"
-        /><label for="target-url">애플리케이션 URL</label
+        />
+        <label for="target-mode">검사 방식</label>
+        <select id="target-mode" name="mode">
+          <option value="site">일반 사이트 · 응답 헤더 확인</option>
+          <option value="juice">로컬 Juice Shop · 전용 실습</option>
+        </select>
+        <label for="target-url">애플리케이션 URL</label
         ><input
           id="target-url"
           name="url"
@@ -601,9 +606,9 @@
           placeholder="http://127.0.0.1:3000"
           required
         />
-        <p class="field-help">
-          현재 지원 대상: 로컬 OWASP Juice Shop. 다른 앱은 전용 검증 어댑터가
-          필요합니다.
+        <p class="field-help" id="target-url-help">
+          공개 도메인, localhost 또는 허용된 사설 IP를 입력하세요. 일반 사이트는
+          경로도 지정할 수 있습니다.
         </p>
         <label for="target-source"
           >소스코드 경로 <span class="optional">선택</span></label
@@ -665,8 +670,12 @@
           </button>
         </div>
         <label for="job-target">진단 대상</label
-        ><select id="job-target" name="target_id" required></select
-        ><label class="check-card"
+        ><select id="job-target" name="target_id" required></select>
+        <p class="field-help" id="job-site-help" hidden>
+          일반 사이트는 등록 URL에 HEAD 요청 한 번으로 nosniff 헤더를
+          확인합니다.
+        </p>
+        <label class="check-card"
           ><input
             type="checkbox"
             name="compare_tools"

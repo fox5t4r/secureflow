@@ -17,6 +17,9 @@ codex login status
 
 설정에서 Codex를 선택하고 모델을 비워 CLI 기본값을 쓰거나 계정에서 사용 가능한 모델 ID를 지정합니다.
 심층 모델은 별도로 지정할 수 있습니다. 비어 있으면 일반 모델을 사용합니다.
+백그라운드 서버에서 Codex 파일을 찾지 못하면 서버 실행 환경의
+`SECUREFLOW_CODEX_BIN`에 `command -v codex`로 확인한 절대 경로를 지정하세요.
+Claude Code에는 `SECUREFLOW_CLAUDE_BIN`을 사용할 수 있습니다. 서버는 CLI에 로그인한 사용자로 실행합니다.
 검증한 CLI 버전은 0.169.0입니다. 해당 버전 이상의 필요한 옵션을 지원하는 CLI를 사용하세요.
 [공식 구독 인증](https://developers.openai.com/codex/auth/) · [비대화형 실행](https://developers.openai.com/codex/noninteractive/)
 

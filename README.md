@@ -15,8 +15,14 @@ Python 3.12+ · Linux / WSL2 · MIT
 - **로컬 앙상블**: 기본 경량 모델 2종의 독립 의견·동일 위치 지적을 비교
 - OWASP Top 10:2025의 10개 범주를 다루는 40개 실습 사례와 정량 평가
 
-현재 동적 어댑터는 **자체 실습 앱과 로컬 OWASP Juice Shop**을 지원합니다.
+전용 동적 어댑터는 **자체 실습 앱과 로컬 OWASP Juice Shop**을 지원합니다.
 임의 사이트 전체를 자동 진단하거나 AI 가설을 실제 취약점으로 확정하지 않습니다.
+
+**진단 대상 → 대상 등록 → 일반 사이트**에서 `https://example.com/docs/` 또는 `http://localhost:8000/app/`처럼 URL을 입력하세요.
+등록 경로에 비인증 HEAD 요청을 한 번 보내 `X-Content-Type-Options: nosniff` 설정을 확인합니다.
+공개 도메인은 HTTP 80 또는 HTTPS 443 포트를 지원합니다. DNS 결과에 비공개 주소가 있으면 연결을 거부하며, 리다이렉트는 따라가지 않습니다.
+로컬 주소와 `SECUREFLOW_ALLOWED_HOSTS`에 등록한 사설 IP도 지원합니다. HTTPS는 신뢰할 수 있는 인증서가 필요합니다.
+연결한 소스가 있으면 Semgrep 검사 결과도 두 리포트에 포함됩니다.
 
 ## Quick start
 
